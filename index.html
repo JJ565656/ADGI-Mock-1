@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Touch + Mouse Carousel with Screensaver</title>
+  <style>
+    * {
+  * {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html, body {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  font-family: sans-serif;
+  touch-action: pan-y;
+  background: #f5f5f5;
+}
+
+.carousel {
+  display: flex;
+  width: 100vw;
+  height: 100vh;
+  transition: transform 0.4s ease;
+}
+
+.page {
+  flex: 0 0 100vw;
+  height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  font-size: clamp(1.5rem, 3vw, 2.5rem);
+  padding: 2rem;
+  overflow-y: auto;
+}
+
+#screensaver {
+  position: fixed;
+  top: 0; left: 0;
+  width: 100%;
+  height: 100%;
+  background: transparent;
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: clamp(1.5rem, 3vw, 2.5rem);
+  z-index: 10;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.5s ease;
+  padding: 0rem;
+  text-align: center;
+}
+
+#screensaver.active {
+  opacity: 1;
+  pointer-events: auto;
+  
+}
+
+  #screensaver iframe {
+  width: 100%;
+  height: 100%;
+  border: none;
+  display: block;
+  background: transparent;
+}
+      
+@media (max-width: 768px) {
+  .page {
+    padding: 1.5rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .page {
+    padding: 1rem;
+  }
+}
+
+  </style>
+</head>
+<body>
+
+  <!-- Screensaver Overlay -->
+  <div id="screensaver" role="dialog" aria-modal="true" tabindex="-1">
+  <!-- interaction layer to detect touch -->
+  <div id="screensaver-overlay" style="
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    z-index: 11;
+    background: transparent;
+  "></div>
+
+  <!-- iframe as screensaver -->
+  <iframe src="./Animation-Alt2-main/index.html" title="Screensaver" style="
+    width: 100%;
+    height: 100%;
+    border: none;
+    z-index: 10;
+    position: relative;
+  "></iframe>
+</div>
+
+  <!-- Carousel Container -->
+  <div class="carousel" id="carousel">
+    <div class="page" style="background:#E3DBCC;">Page 1</div>
+    <div class="page" style="background:#90B4D3;">Page 2</div>
+    <div class="page" style="background:#A4978E;">Page 3</div>
+  </div>
+
+  <script>
+  const carousel = document.getElementById('carousel');
+const screensaver = document.getElementById('screensaver');
+const pages = document.querySelectorAll('.page');
+const totalPages = pages.length;
+
+let currentPage = 0;
+let isScreensaverActive = false;
+let idleTimer;
+
+// Set dynamic width
+carousel.style.width = `${100 * totalPages}%`;
+
+// Set up page ARIA visibility
+function updateCarousel() {
+  carousel.style.transform = `translateX(-${currentPage * 100}vw)`;
+  pages.forEach((page, index) => {
+    page.setAttribute("aria-hidden", index !== currentPage);
+  });
+}
+
+function activateScreensaver() {
+  screensaver.classList.add('active');
+  screensaver.focus();
+  isScreensaverActive = true;
+}
+
+function deactivateScreensaver() {
+  screensaver.classList.remove('active');
+  isScreensaverActive = false;
+  resetIdleTimer();
+  pages[currentPage].focus();
+}
+
+function resetIdleTimer() {
+  clearTimeout(idleTimer);
+  idleTimer = setTimeout(activateScreensaver, 10000);
+}
+
+// --- Touch & Mouse Swipe ---
+let startX = 0;
+let isDragging = false;
+let hasSwiped = false;
+
+// Touch events
+document.body.addEventListener('touchstart', e => {
+  if (isScreensaverActive) {
+    deactivateScreensaver();
+    return;
+  }
+  startX = e.touches[0].clientX;
+  hasSwiped = false;
+});
+
+document.body.addEventListener('touchend', e => {
+  if (hasSwiped) return;
+  const endX = e.changedTouches[0].clientX;
+  handleSwipe(startX, endX);
+  hasSwiped = true;
+});
+
+// Mouse events
+document.body.addEventListener('mousedown', e => {
+  if (isScreensaverActive) {
+    deactivateScreensaver();
+    return;
+  }
+  isDragging = true;
+  startX = e.clientX;
+  hasSwiped = false;
+});
+
+document.body.addEventListener('mouseup', e => {
+  if (!isDragging || hasSwiped) return;
+  const endX = e.clientX;
+  handleSwipe(startX, endX);
+  isDragging = false;
+  hasSwiped = true;
+});
+
+// Swipe detection
+function handleSwipe(start, end) {
+  const deltaX = end - start;
+  const threshold = 50;
+
+  if (Math.abs(deltaX) < threshold) return;
+
+  if (deltaX < 0 && currentPage < totalPages - 1) {
+    currentPage++;
+  } else if (deltaX > 0 && currentPage > 0) {
+    currentPage--;
+  }
+
+  updateCarousel();
+  resetIdleTimer();
+}
+
+// Keyboard support
+document.addEventListener('keydown', e => {
+  if (isScreensaverActive && e.key === 'Escape') {
+    deactivateScreensaver();
+  } else if (!isScreensaverActive) {
+    if (e.key === 'ArrowRight' && currentPage < totalPages - 1) {
+      currentPage++;
+      updateCarousel();
+    }
+    if (e.key === 'ArrowLeft' && currentPage > 0) {
+      currentPage--;
+      updateCarousel();
+    }
+    resetIdleTimer();
+  }
+});
+
+// Reset idle timer on activity
+['click', 'mousemove', 'touchstart'].forEach(event => {
+  document.addEventListener(event, () => {
+    if (!isScreensaverActive) resetIdleTimer();
+  });
+});
+
+// Init
+updateCarousel();
+resetIdleTimer();
+
+    document.getElementById('screensaver-overlay').addEventListener('click', () => {
+  deactivateScreensaver();
+});
+
+
+    document.getElementById('screensaver-overlay').addEventListener('touchstart', () => {
+  deactivateScreensaver();
+});
+
+  </script>
+
+</body>
+</html>
